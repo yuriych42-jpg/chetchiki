@@ -42,10 +42,15 @@ jobs:
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       
+      
       - name: Fix Gradle version
         run: |
-          sed -i 's/gradle-8.7/gradle-8.9/g' "$PROJECT_DIR/gradle/wrapper/gradle-wrapper.properties"
-
+          cd "$PROJECT_DIR"
+          sed -i 's/gradle-8.7/gradle-8.9/g' gradle/wrapper/gradle-wrapper.properties
+          grep distributionUrl gradle/wrapper/gradle-wrapper.properties
+          chmod +x gradlew
+          ./gradlew --version
+          
       - name: Build APK
         run: |
           cd "$PROJECT_DIR"
