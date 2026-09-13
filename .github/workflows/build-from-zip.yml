@@ -15,7 +15,6 @@ jobs:
       - name: Download ZIP
         uses: actions/checkout@v4
 
-      
       - name: Extract project
         run: |
           ZIP_FILE="./chetchiki_android_v0_7_gradle89.zip"
@@ -27,7 +26,7 @@ jobs:
           PROJECT_DIR=$(find project -maxdepth 2 -name gradlew -type f -print -quit | xargs dirname)
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Project directory: $PROJECT_DIR"
-          
+
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
@@ -42,21 +41,17 @@ jobs:
         run: |
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-      
-      
       - name: Fix Gradle version
         run: |
-          cd "$PROJECT_DIR"
-          sed -i 's/gradle-8.7/gradle-8.9/g' gradle/wrapper/gradle-wrapper.properties
-          grep distributionUrl gradle/wrapper/gradle-wrapper.properties
-          chmod +x gradlew
-          ./gradlew --version
-          
+          sed -i 's#^distributionUrl=.*#distributionUrl=https\://services.gradle.org/distributions/gradle-8.9-all.zip#' "$PROJECT_DIR/gradle/wrapper/gradle-wrapper.properties"
+          grep distributionUrl "$PROJECT_DIR/gradle/wrapper/gradle-wrapper.properties"
+
       - name: Build APK
         run: |
           cd "$PROJECT_DIR"
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
