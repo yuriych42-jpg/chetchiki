@@ -43,8 +43,9 @@ jobs:
 
       - name: Fix Gradle version
         run: |
-          sed -i 's#^distributionUrl=.*#distributionUrl=https\://services.gradle.org/distributions/gradle-8.9-all.zip#' "$PROJECT_DIR/gradle/wrapper/gradle-wrapper.properties"
-          grep distributionUrl "$PROJECT_DIR/gradle/wrapper/gradle-wrapper.properties"
+          sed -i 's/gradle-8\.7[^"]*\.zip/gradle-8.9-all.zip/g' "$PROJECT_DIR/gradle/wrapper/gradle-wrapper.properties"
+          echo "Gradle wrapper:"
+          cat "$PROJECT_DIR/gradle/wrapper/gradle-wrapper.properties"
 
       - name: Build APK
         run: |
