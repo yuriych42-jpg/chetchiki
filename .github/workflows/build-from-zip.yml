@@ -15,10 +15,11 @@ jobs:
       - name: Download ZIP
         uses: actions/checkout@v4
 
+      
       - name: Extract project
         run: |
-          ZIP_FILE=$(find . -maxdepth 1 -type f -name "*.zip" | head -n 1)
-          test -n "$ZIP_FILE"
+          ZIP_FILE="./chetchiki_android_v0_7_gradle89.zip"
+          test -f "$ZIP_FILE"
           rm -rf project
           mkdir project
           unzip -q "$ZIP_FILE" -d project
@@ -26,7 +27,7 @@ jobs:
           PROJECT_DIR=$(find project -maxdepth 2 -name gradlew -type f -print -quit | xargs dirname)
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Project directory: $PROJECT_DIR"
-
+          
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
