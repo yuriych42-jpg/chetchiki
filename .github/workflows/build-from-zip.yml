@@ -57,7 +57,7 @@ jobs:
           echo "android.useAndroidX=true" >> "$PROJECT_DIR/gradle.properties"
           echo "android.enableJetifier=true" >> "$PROJECT_DIR/gradle.properties"
       
-            - name: Fix Java and Kotlin target
+      - name: Fix Java and Kotlin target
         run: |
           python3 - <<'PY'
           import os
