@@ -43,7 +43,7 @@ jobs:
           packages: ''
 
       - name: Install Android SDK
-       run: |
+        run: |
          sdkmanager --install \
           "platform-tools" \
           "platforms;android-35" \
