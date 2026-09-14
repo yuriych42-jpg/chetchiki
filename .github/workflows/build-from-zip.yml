@@ -151,7 +151,15 @@ jobs:
           ls -la app
 
           echo "=== BUILD FILE ==="
-          cat app/build.gradle
+
+          if [ -f app/build.gradle.kts ]; then
+            cat app/build.gradle.kts
+          elif [ -f app/build.gradle ]; then
+            cat app/build.gradle
+          else
+            echo "Android app build file not found"
+            exit 1
+          fi
 
       - name: Build APK
         shell: bash
