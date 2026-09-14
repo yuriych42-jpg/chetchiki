@@ -167,7 +167,21 @@ jobs:
         run: |
           chmod +x gradlew
 
-          ./gradlew clean assembleDebug --stacktrace --info
+          set +e
+
+          ./gradlew clean assembleDebug --stacktrace --info 2>&1 | tee build.log
+
+          RESULT=${PIPESTATUS[0]}
+
+          echo ""
+          echo "================ FIRST ERROR LINES ================"
+          grep -n -E "What went wrong|Caused by:|ERROR|error:|Minimum supported|requires|requires Java|JDK|plugin" build.log | head -80 || true
+
+          echo ""
+          echo "================ LAST 120 LINES ================"
+          tail -120 build.log
+
+          exit $RESULT
 
       - name: Find APK
         shell: bash
