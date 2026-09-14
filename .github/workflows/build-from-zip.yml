@@ -42,13 +42,6 @@ jobs:
         with:
           packages: ''
 
-      - name: Install Android SDK
-        run: |
-         sdkmanager --install \
-          "platform-tools" \
-          "platforms;android-35" \
-          "build-tools;35.0.0"
-
       - name: Fix Gradle version
         run: |
           sed -i 's/gradle-8\.7[^"]*\.zip/gradle-8.9-all.zip/g' "$PROJECT_DIR/gradle/wrapper/gradle-wrapper.properties"
