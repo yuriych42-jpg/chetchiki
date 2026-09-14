@@ -165,11 +165,9 @@ jobs:
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
-          set -e
-
           chmod +x gradlew
 
-          ./gradlew clean assembleDebug --stacktrace
+          ./gradlew clean assembleDebug --stacktrace --info
 
       - name: Find APK
         shell: bash
