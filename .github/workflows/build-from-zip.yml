@@ -39,10 +39,15 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: ''
 
       - name: Install Android SDK
-        run: |
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+       run: |
+         sdkmanager --install \
+          "platform-tools" \
+          "platforms;android-35" \
+          "build-tools;35.0.0"
 
       - name: Fix Gradle version
         run: |
