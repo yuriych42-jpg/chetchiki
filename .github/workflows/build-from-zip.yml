@@ -17,7 +17,7 @@ jobs:
 
       - name: Extract project
         run: |
-          ZIP_FILE="./chetchiki_android_v0_7_gradle89.zip"
+          ZIP_FILE="./chetchiki_android_v0_7_fixed.zip"
           test -f "$ZIP_FILE"
           rm -rf project
           mkdir project
