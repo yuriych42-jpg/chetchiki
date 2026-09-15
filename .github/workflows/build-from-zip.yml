@@ -20,7 +20,9 @@ jobs:
         run: |
           set -e
 
-          ./chetchiki_android_final11_fix.zip
+          set -e
+
+          ZIP_FILE="./chetchiki_android_final11_fix.zip"
           test -f "$ZIP_FILE"
 
           rm -rf project
