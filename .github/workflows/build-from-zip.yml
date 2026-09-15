@@ -174,8 +174,7 @@ jobs:
 
           set +e
 
-          "$HOME/gradle-8.9/bin/gradle" clean assembleDebug --stacktrace --info 2>&1 | tee build.log 
-
+          "$HOME/gradle-8.9/bin/gradle" clean assembleDebug --stacktrace 2>&1 | tee build.log
           RESULT=${PIPESTATUS[0]}
 
           echo ""
