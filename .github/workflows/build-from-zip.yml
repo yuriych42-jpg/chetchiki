@@ -134,7 +134,11 @@ jobs:
           rm -rf "$HOME/.gradle/wrapper"
           
           echo "=== GRADLE VERSION ==="
-          ./gradlew --version
+          echo "=== INSTALL GRADLE 8.9 ==="
+          curl -L -o /tmp/gradle-8.9-bin.zip https://services.gradle.org/distributions/gradle-8.9-bin.zip
+          rm -rf "$HOME/gradle-8.9"
+          unzip -q /tmp/gradle-8.9-bin.zip -d "$HOME"
+          "$HOME/gradle-8.9/bin/gradle" --version
 
       - name: Check Android project
         shell: bash
@@ -170,7 +174,7 @@ jobs:
 
           set +e
 
-          ./gradlew clean assembleDebug --stacktrace --info 2>&1 | tee build.log
+          "$HOME/gradle-8.9/bin/gradle" clean assembleDebug --stacktrace --info 2>&1 | tee build.log 
 
           RESULT=${PIPESTATUS[0]}
 
