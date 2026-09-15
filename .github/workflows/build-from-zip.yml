@@ -117,9 +117,7 @@ jobs:
           echo "=== BEFORE ==="
           cat gradle/wrapper/gradle-wrapper.properties
 
-          sed -i \
-            's#distributionUrl=.*#distributionUrl=https\\://services.gradle.org/distributions/gradle-8.9-all.zip#' \
-            gradle/wrapper/gradle-wrapper.properties
+          sed -i -E 's#^distributionUrl=.*#distributionUrl=https://services.gradle.org/distributions/gradle-8.9-all.zip#' gradle/wrapper/gradle-wrapper.properties
 
           echo "=== AFTER ==="
           cat gradle/wrapper/gradle-wrapper.properties
