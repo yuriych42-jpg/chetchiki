@@ -199,6 +199,8 @@ jobs:
 
           APK=$(find . -type f -name "*.apk" | head -1)
 
+          APK="${APK#./}"
+     
           if [ -z "$APK" ]; then
             echo "APK not found"
             exit 1
