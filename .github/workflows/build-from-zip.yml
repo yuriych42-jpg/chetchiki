@@ -20,7 +20,7 @@ jobs:
         run: |
           set -e
 
-          ZIP_FILE="./chetchiki_android_final5_update.zip"
+          ZIP_FILE="./chetchiki_android_final10_auto_send.zip"
 
           test -f "$ZIP_FILE"
 
