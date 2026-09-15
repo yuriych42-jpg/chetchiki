@@ -130,6 +130,9 @@ jobs:
           org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
           EOF
 
+          rm -rf "$HOME/.gradle/caches" "$HOME/.gradle/wrapper/dists"
+          rm -rf "$HOME/.gradle/wrapper"
+          
           echo "=== GRADLE VERSION ==="
           ./gradlew --version
 
