@@ -25,8 +25,8 @@ jobs:
           ZIP_FILE=$(find . -maxdepth 1 -type f -name 'chetchiki_android_*.zip' | sort -V | tail -1)
 
           if [ -z "$ZIP_FILE" ]; then
-           echo "Android ZIP not found"
-           exit 1
+            echo "Android ZIP not found"
+            exit 1
           fi
 
           echo "Using ZIP: $ZIP_FILE"
