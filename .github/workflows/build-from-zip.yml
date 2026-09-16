@@ -22,7 +22,7 @@ jobs:
 
           set -e
 
-          ZIP_FILE="./chetchiki_android_final12_auto_process.zip"
+          ZIP_FILE="./chetchiki_android_final13_password_view.zip"
           test -f "$ZIP_FILE"
 
           rm -rf project
