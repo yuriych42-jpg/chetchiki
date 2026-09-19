@@ -22,14 +22,30 @@ jobs:
 
           set -e
 
-          ZIP_FILE=$(find . -maxdepth 1 -type f \( -name 'chetchiki_android_final*.zip' -o -name 'chetchiki_android_v*.zip' \) | sort -V | tail -1)
+          ZIP_FILE="./chetchiki_android_final19.zip"
 
-          if [ -z "$ZIP_FILE" ]; then
-            echo "Android ZIP not found"
+          if [ ! -f "$ZIP_FILE" ]; then
+            echo "Android ZIP not found: $ZIP_FILE"
+            echo "Available ZIP files:"
+            find . -maxdepth 1 -type f -name "*.zip" -print
             exit 1
           fi
 
           echo "Using ZIP: $ZIP_FILE"
+
+          echo "=== VERIFY VERSION INSIDE ZIP ==="
+          unzip -l "$ZIP_FILE" | grep -E "build.gradle.kts|build.gradle" | head -20
+
+          echo "=== VERIFY APP VERSION ==="
+
+          VERSION_LINE=$(grep -R 'versionName' project --include='build.gradle.kts' --include='build.gradle' | head -1 || true)
+
+          echo "VERSION: $VERSION_LINE"
+
+          echo "$VERSION_LINE" | grep -q '0.88' || {
+          echo "ERROR: ZIP does not contain version 0.88"
+          exit 1
+          }
 
           rm -rf project
           mkdir -p project
