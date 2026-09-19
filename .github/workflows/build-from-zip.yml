@@ -20,12 +20,14 @@ jobs:
         run: |
           set -e
 
-          set -e
+          echo "=== SEARCH FOR ANDROID ZIP ==="
 
-          ZIP_FILE="./chetchiki_android_final19.zip"
+          ZIP_FILE=$(find . -maxdepth 1 -type f \
+            \( -name 'chetchiki_android_final*.zip' -o -name 'chetchiki_android_v*.zip' \) \
+            | sort -V | tail -1)
 
-          if [ ! -f "$ZIP_FILE" ]; then
-            echo "Android ZIP not found: $ZIP_FILE"
+          if [ -z "$ZIP_FILE" ]; then
+            echo "Android ZIP not found"
             echo "Available ZIP files:"
             find . -maxdepth 1 -type f -name "*.zip" -print
             exit 1
@@ -33,38 +35,12 @@ jobs:
 
           echo "Using ZIP: $ZIP_FILE"
 
-          echo "=== VERIFY VERSION INSIDE ZIP ==="
-          unzip -l "$ZIP_FILE" | grep -E "build.gradle.kts|build.gradle" | head -20
-
-          echo "=== VERIFY APP VERSION ==="
-
-          VERSION_LINE=$(grep -R 'versionName' project --include='build.gradle.kts' --include='build.gradle' | head -1 || true)
-
-          echo "VERSION: $VERSION_LINE"
-
-          echo "$VERSION_LINE" | grep -q '0.88' || {
-          echo "ERROR: ZIP does not contain version 0.88"
-          exit 1
-          }
-
           rm -rf project
           mkdir -p project
 
           unzip -q "$ZIP_FILE" -d project
 
-          echo "=== VERIFY APP VERSION ==="
-
-          VERSION_LINE=$(grep 'versionName' project/app/build.gradle.kts | head -1 || true)
-
-          if [ -z "$VERSION_LINE" ]; then
-          echo "ERROR: versionName not found"
-            exit 1
-          fi
-
-          echo "Detected version: $VERSION_LINE"
-
-          echo "=== ZIP CONTENT ==="
-          find project -maxdepth 5 -type f | sort | head -300
+          echo "=== FIND ANDROID PROJECT ==="
 
           PROJECT_DIR=""
 
@@ -90,6 +66,32 @@ jobs:
           fi
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+          echo "=== VERIFY APP VERSION ==="
+
+          BUILD_FILE="$PROJECT_DIR/app/build.gradle.kts"
+
+          if [ ! -f "$BUILD_FILE" ]; then
+            echo "ERROR: $BUILD_FILE not found"
+            exit 1
+          fi
+
+          VERSION_LINE=$(grep 'versionName' "$BUILD_FILE" | head -1 || true)
+
+          if [ -z "$VERSION_LINE" ]; then
+            echo "ERROR: versionName not found"
+            exit 1
+          fi
+
+          VERSION_CODE_LINE=$(grep 'versionCode' "$BUILD_FILE" | head -1 || true)
+
+          if [ -z "$VERSION_CODE_LINE" ]; then
+            echo "ERROR: versionCode not found"
+            exit 1
+          fi
+
+          echo "Detected version: $VERSION_LINE"
+          echo "Detected version code: $VERSION_CODE_LINE"
 
           echo "=== PROJECT ROOT ==="
           echo "$PROJECT_DIR"
@@ -164,14 +166,19 @@ jobs:
           org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
           EOF
 
-          rm -rf "$HOME/.gradle/caches" "$HOME/.gradle/wrapper/dists"
+          rm -rf "$HOME/.gradle/caches"
+          rm -rf "$HOME/.gradle/wrapper/dists"
           rm -rf "$HOME/.gradle/wrapper"
-          
-          echo "=== GRADLE VERSION ==="
+
           echo "=== INSTALL GRADLE 8.9 ==="
-          curl -L -o /tmp/gradle-8.9-bin.zip https://services.gradle.org/distributions/gradle-8.9-bin.zip
+
+          curl -L -o /tmp/gradle-8.9-bin.zip \
+            https://services.gradle.org/distributions/gradle-8.9-bin.zip
+
           rm -rf "$HOME/gradle-8.9"
+
           unzip -q /tmp/gradle-8.9-bin.zip -d "$HOME"
+
           "$HOME/gradle-8.9/bin/gradle" --version
 
       - name: Check Android project
@@ -209,19 +216,24 @@ jobs:
           set +e
 
           "$HOME/gradle-8.9/bin/gradle" clean assembleDebug --stacktrace 2>&1 | tee build.log
+
           RESULT=${PIPESTATUS[0]}
 
           echo ""
           echo "================ FIRST ERROR LINES ================"
-          grep -n -E "What went wrong|Caused by:|ERROR|error:|Minimum supported|requires|requires Java|JDK|plugin" build.log | head -80 || true
+
+          grep -n -E \
+            "What went wrong|Caused by:|ERROR|error:|Minimum supported|requires|requires Java|JDK|plugin" \
+            build.log | head -80 || true
 
           echo ""
           echo "================ LAST 120 LINES ================"
+
           tail -120 build.log
 
           exit $RESULT
 
-      - name: Find APK
+      - name: Verify APK version
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
@@ -233,12 +245,22 @@ jobs:
 
           APK=$(find . -type f -name "*.apk" | head -1)
 
-          APK="${APK#./}"
-     
           if [ -z "$APK" ]; then
             echo "APK not found"
             exit 1
           fi
+
+          echo "APK: $APK"
+
+          echo "=== VERIFY APK PACKAGE ==="
+
+          if command -v aapt >/dev/null 2>&1; then
+            aapt dump badging "$APK" | head -20
+          else
+            echo "aapt not found, skipping APK metadata check"
+          fi
+
+          APK="${APK#./}"
 
           echo "APK=$APK" >> "$GITHUB_ENV"
 
