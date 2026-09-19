@@ -22,12 +22,15 @@ jobs:
 
           echo "=== SEARCH FOR ANDROID ZIP ==="
 
+          # Сначала ищем final*.zip.
+          # Старые v*.zip не используются.
           ZIP_FILE=$(find . -maxdepth 1 -type f \
-            \( -name 'chetchiki_android_final*.zip' -o -name 'chetchiki_android_v*.zip' \) \
-            | sort -V | tail -1)
+            -name 'chetchiki_android_final*.zip' \
+            | sort -V \
+            | tail -1)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "Android ZIP not found"
+            echo "Android final ZIP not found."
             echo "Available ZIP files:"
             find . -maxdepth 1 -type f -name "*.zip" -print
             exit 1
@@ -59,7 +62,6 @@ jobs:
 
           if [ -z "$PROJECT_DIR" ]; then
             echo "Android project root not found."
-            echo "Searching for settings.gradle and app:"
             find project -name settings.gradle -o -name settings.gradle.kts
             find project -type d -name app
             exit 1
