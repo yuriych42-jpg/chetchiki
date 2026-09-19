@@ -52,6 +52,17 @@ jobs:
 
           unzip -q "$ZIP_FILE" -d project
 
+          echo "=== VERIFY APP VERSION ==="
+
+          VERSION_LINE=$(grep 'versionName' project/app/build.gradle.kts | head -1 || true)
+
+          if [ -z "$VERSION_LINE" ]; then
+          echo "ERROR: versionName not found"
+            exit 1
+          fi
+
+          echo "Detected version: $VERSION_LINE"
+
           echo "=== ZIP CONTENT ==="
           find project -maxdepth 5 -type f | sort | head -300
 
