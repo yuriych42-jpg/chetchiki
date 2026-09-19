@@ -15,33 +15,102 @@ jobs:
       - name: Download ZIP
         uses: actions/checkout@v4
 
-      - name: Extract project
+      - name: Select newest Android ZIP by versionCode and extract project
         shell: bash
         run: |
           set -e
 
-          echo "=== SEARCH FOR ANDROID ZIP ==="
+          echo "=== SEARCH FOR ANDROID ZIP FILES ==="
 
-          # Сначала ищем final*.zip.
-          # Старые v*.zip не используются.
-          ZIP_FILE=$(find . -maxdepth 1 -type f \
-            -name 'chetchiki_android_final*.zip' \
-            | sort -V \
-            | tail -1)
+          BEST_ZIP=""
+          BEST_VERSION_CODE=-1
+          BEST_VERSION_NAME=""
 
-          if [ -z "$ZIP_FILE" ]; then
-            echo "Android final ZIP not found."
+          FOUND_ZIPS=0
+
+          while IFS= read -r -d '' ZIP_FILE; do
+            FOUND_ZIPS=$((FOUND_ZIPS + 1))
+
+            echo ""
+            echo "----------------------------------------"
+            echo "Checking ZIP: $ZIP_FILE"
+
+            BUILD_FILE_IN_ZIP=$(unzip -Z1 "$ZIP_FILE" 2>/dev/null \
+              | grep -E '(^|/)app/build\.gradle\.kts$' \
+              | head -1 || true)
+
+            if [ -z "$BUILD_FILE_IN_ZIP" ]; then
+              echo "SKIP: app/build.gradle.kts not found"
+              continue
+            fi
+
+            echo "Build file: $BUILD_FILE_IN_ZIP"
+
+            VERSION_CODE_LINE=$(unzip -p "$ZIP_FILE" "$BUILD_FILE_IN_ZIP" 2>/dev/null \
+              | grep -E '^[[:space:]]*versionCode[[:space:]]*=' \
+              | head -1 || true)
+
+            VERSION_NAME_LINE=$(unzip -p "$ZIP_FILE" "$BUILD_FILE_IN_ZIP" 2>/dev/null \
+              | grep -E '^[[:space:]]*versionName[[:space:]]*=' \
+              | head -1 || true)
+
+            if [ -z "$VERSION_CODE_LINE" ]; then
+              echo "SKIP: versionCode not found"
+              continue
+            fi
+
+            VERSION_CODE=$(echo "$VERSION_CODE_LINE" \
+              | sed -E 's/[^0-9]*([0-9]+).*/\1/' || true)
+
+            VERSION_NAME=$(echo "$VERSION_NAME_LINE" \
+              | sed -E 's/.*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/' || true)
+
+            if [ -z "$VERSION_CODE" ] || ! [[ "$VERSION_CODE" =~ ^[0-9]+$ ]]; then
+              echo "SKIP: invalid versionCode: $VERSION_CODE_LINE"
+              continue
+            fi
+
+            echo "versionName: $VERSION_NAME"
+            echo "versionCode: $VERSION_CODE"
+
+            if [ "$VERSION_CODE" -gt "$BEST_VERSION_CODE" ]; then
+              BEST_ZIP="$ZIP_FILE"
+              BEST_VERSION_CODE="$VERSION_CODE"
+              BEST_VERSION_NAME="$VERSION_NAME"
+            fi
+
+          done < <(
+            find . -maxdepth 1 -type f \
+              -name 'chetchiki_android_final*.zip' \
+              -print0
+          )
+
+          echo ""
+          echo "========================================"
+          echo "ZIP FILES FOUND: $FOUND_ZIPS"
+          echo "========================================"
+
+          if [ -z "$BEST_ZIP" ]; then
+            echo "ERROR: No valid Android ZIP with versionCode found."
+            echo ""
             echo "Available ZIP files:"
             find . -maxdepth 1 -type f -name "*.zip" -print
             exit 1
           fi
 
-          echo "Using ZIP: $ZIP_FILE"
+          echo ""
+          echo "========================================"
+          echo "SELECTED ZIP"
+          echo "========================================"
+          echo "Using ZIP: $BEST_ZIP"
+          echo "Selected versionName: $BEST_VERSION_NAME"
+          echo "Selected versionCode: $BEST_VERSION_CODE"
+          echo "========================================"
 
           rm -rf project
           mkdir -p project
 
-          unzip -q "$ZIP_FILE" -d project
+          unzip -q "$BEST_ZIP" -d project
 
           echo "=== FIND ANDROID PROJECT ==="
 
@@ -61,15 +130,24 @@ jobs:
           done < <(find project -type f -name gradlew)
 
           if [ -z "$PROJECT_DIR" ]; then
-            echo "Android project root not found."
-            find project -name settings.gradle -o -name settings.gradle.kts
-            find project -type d -name app
+            echo "ERROR: Android project root not found."
+            echo ""
+            echo "Searching for settings.gradle:"
+            find project \
+              \( -name settings.gradle -o -name settings.gradle.kts \) \
+              -print
+
+            echo ""
+            echo "Searching for app directories:"
+            find project -type d -name app -print
+
             exit 1
           fi
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-          echo "=== VERIFY APP VERSION ==="
+          echo ""
+          echo "=== VERIFY SELECTED APP VERSION ==="
 
           BUILD_FILE="$PROJECT_DIR/app/build.gradle.kts"
 
@@ -78,14 +156,16 @@ jobs:
             exit 1
           fi
 
-          VERSION_LINE=$(grep 'versionName' "$BUILD_FILE" | head -1 || true)
+          VERSION_LINE=$(grep -E '^[[:space:]]*versionName[[:space:]]*=' \
+            "$BUILD_FILE" | head -1 || true)
+
+          VERSION_CODE_LINE=$(grep -E '^[[:space:]]*versionCode[[:space:]]*=' \
+            "$BUILD_FILE" | head -1 || true)
 
           if [ -z "$VERSION_LINE" ]; then
             echo "ERROR: versionName not found"
             exit 1
           fi
-
-          VERSION_CODE_LINE=$(grep 'versionCode' "$BUILD_FILE" | head -1 || true)
 
           if [ -z "$VERSION_CODE_LINE" ]; then
             echo "ERROR: versionCode not found"
@@ -95,11 +175,16 @@ jobs:
           echo "Detected version: $VERSION_LINE"
           echo "Detected version code: $VERSION_CODE_LINE"
 
+          echo ""
           echo "=== PROJECT ROOT ==="
           echo "$PROJECT_DIR"
 
+          echo ""
           echo "=== PROJECT FILES ==="
           ls -la "$PROJECT_DIR"
+
+          echo ""
+          echo "=== APP FILES ==="
           ls -la "$PROJECT_DIR/app"
 
       - name: Set up JDK
@@ -155,7 +240,9 @@ jobs:
           echo "=== BEFORE ==="
           cat gradle/wrapper/gradle-wrapper.properties
 
-          sed -i -E 's#^distributionUrl=.*#distributionUrl=https://services.gradle.org/distributions/gradle-8.9-all.zip#' gradle/wrapper/gradle-wrapper.properties
+          sed -i -E \
+            's#^distributionUrl=.*#distributionUrl=https://services.gradle.org/distributions/gradle-8.9-all.zip#' \
+            gradle/wrapper/gradle-wrapper.properties
 
           echo "=== AFTER ==="
           cat gradle/wrapper/gradle-wrapper.properties
@@ -192,12 +279,15 @@ jobs:
           echo "=== CURRENT DIRECTORY ==="
           pwd
 
+          echo ""
           echo "=== PROJECT ==="
           ls -la
 
+          echo ""
           echo "=== APP ==="
           ls -la app
 
+          echo ""
           echo "=== BUILD FILE ==="
 
           if [ -f app/build.gradle.kts ]; then
@@ -217,7 +307,8 @@ jobs:
 
           set +e
 
-          "$HOME/gradle-8.9/bin/gradle" clean assembleDebug --stacktrace 2>&1 | tee build.log
+          "$HOME/gradle-8.9/bin/gradle" clean assembleDebug \
+            --stacktrace 2>&1 | tee build.log
 
           RESULT=${PIPESTATUS[0]}
 
@@ -248,12 +339,13 @@ jobs:
           APK=$(find . -type f -name "*.apk" | head -1)
 
           if [ -z "$APK" ]; then
-            echo "APK not found"
+            echo "ERROR: APK not found"
             exit 1
           fi
 
           echo "APK: $APK"
 
+          echo ""
           echo "=== VERIFY APK PACKAGE ==="
 
           if command -v aapt >/dev/null 2>&1; then
