@@ -28,7 +28,6 @@ jobs:
 
           while IFS= read -r -d '' ZIP_FILE; do
             echo ""
-            echo "----------------------------------------"
             echo "Checking: $ZIP_FILE"
 
             BUILD_FILE=$(unzip -Z1 "$ZIP_FILE" 2>/dev/null \
@@ -92,9 +91,7 @@ jobs:
           echo "========================================"
 
           if [ "$BEST_VERSION_CODE" -lt 172 ]; then
-            echo ""
             echo "ERROR: Selected ZIP is older than version 1.72."
-            echo "Refusing to build old APK."
             exit 1
           fi
 
@@ -115,7 +112,6 @@ jobs:
 
             if [ -f "$DIR/settings.gradle" ] || \
                [ -f "$DIR/settings.gradle.kts" ]; then
-
               if [ -d "$DIR/app" ]; then
                 PROJECT_DIR="$DIR"
                 break
@@ -125,25 +121,12 @@ jobs:
 
           if [ -z "$PROJECT_DIR" ]; then
             echo "ERROR: Android project root not found."
-
-            echo ""
-            echo "settings.gradle files:"
-            find project \
-              \( -name settings.gradle -o -name settings.gradle.kts \) \
-              -print
-
-            echo ""
-            echo "gradlew files:"
-            find project -type f -name gradlew -print
-
             exit 1
           fi
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-          echo ""
-          echo "Android project:"
-          echo "$PROJECT_DIR"
+          echo "Android project: $PROJECT_DIR"
 
       - name: Verify source version
         shell: bash
@@ -158,9 +141,6 @@ jobs:
             echo "ERROR: Android build file not found"
             exit 1
           fi
-
-          echo "=== BUILD FILE ==="
-          cat "$BUILD_FILE"
 
           VERSION_CODE=$(grep -E \
             '^[[:space:]]*versionCode[[:space:]]*(=|)[[:space:]]*[0-9]+' \
@@ -177,7 +157,6 @@ jobs:
             | sed -E 's/.*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/' \
             || true)
 
-          echo ""
           echo "SOURCE versionName: $VERSION_NAME"
           echo "SOURCE versionCode: $VERSION_CODE"
 
@@ -187,9 +166,7 @@ jobs:
           fi
 
           if [ "$VERSION_CODE" -lt 172 ]; then
-            echo ""
-            echo "ERROR: This is still an old project."
-            echo "Expected versionCode >= 172."
+            echo "ERROR: Source project is older than 1.72."
             exit 1
           fi
 
@@ -200,30 +177,32 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      - name: Prepare Gradle
+      - name: Install Gradle 8.9
         shell: bash
-        working-directory: ${{ env.PROJECT_DIR }}
         run: |
           set -e
 
-          chmod +x gradlew
+          GRADLE_VERSION="8.9"
+          GRADLE_DIR="$HOME/gradle-$GRADLE_VERSION"
 
-          if [ -f gradle/wrapper/gradle-wrapper.properties ]; then
-            sed -i \
-              's#^distributionUrl=.*#distributionUrl=https\://services.gradle.org/distributions/gradle-8.9-all.zip#' \
-              gradle/wrapper/gradle-wrapper.properties
+          if [ ! -x "$GRADLE_DIR/bin/gradle" ]; then
+            wget -q \
+              "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
+              -O /tmp/gradle.zip
+
+            rm -rf "$GRADLE_DIR"
+
+            unzip -q /tmp/gradle.zip -d "$HOME"
+
+            if [ ! -d "$GRADLE_DIR" ]; then
+              echo "ERROR: Gradle 8.9 installation failed"
+              exit 1
+            fi
           fi
 
-          mkdir -p "$HOME/.gradle"
+          echo "$GRADLE_DIR/bin" >> "$GITHUB_PATH"
 
-          cat > "$HOME/.gradle/gradle.properties" <<'EOF'
-          android.useAndroidX=true
-          android.enableJetifier=true
-          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-          EOF
-
-          echo "=== GRADLE WRAPPER ==="
-          cat gradle/wrapper/gradle-wrapper.properties
+          "$GRADLE_DIR/bin/gradle" --version
 
       - name: Build APK
         shell: bash
@@ -231,9 +210,13 @@ jobs:
         run: |
           set -e
 
-          chmod +x gradlew
+          echo "=== USING GRADLE ==="
+          gradle --version
 
-          ./gradlew clean assembleDebug --stacktrace
+          echo ""
+          echo "=== BUILD ==="
+
+          gradle clean assembleDebug --stacktrace
 
       - name: Verify APK version
         shell: bash
