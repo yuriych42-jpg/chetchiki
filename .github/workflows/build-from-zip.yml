@@ -124,6 +124,8 @@ jobs:
             exit 1
           fi
 
+          PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd)"
+
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
           echo "Android project: $PROJECT_DIR"
@@ -175,7 +177,6 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-          cache: gradle
 
       - name: Install Gradle 8.9
         shell: bash
@@ -235,8 +236,10 @@ jobs:
             exit 1
           fi
 
+          APK_ABS="$(cd "$(dirname "$APK")" && pwd)/$(basename "$APK")"
+
           echo ""
-          echo "APK: $APK"
+          echo "APK: $APK_ABS"
 
           SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
           AAPT="$SDK_ROOT/build-tools/35.0.0/aapt"
@@ -244,15 +247,14 @@ jobs:
           if [ -x "$AAPT" ]; then
             echo ""
             echo "=== APK VERSION ==="
-
-            "$AAPT" dump badging "$APK" | grep -E '^package:'
+            "$AAPT" dump badging "$APK_ABS" | grep -E '^package:'
           fi
 
-          echo "APK=$APK" >> "$GITHUB_ENV"
+          echo "APK_ABS=$APK_ABS" >> "$GITHUB_ENV"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: chetchiki-apk-1.72
-          path: ${{ env.PROJECT_DIR }}/${{ env.APK }}
+          path: ${{ env.APK_ABS }}
           if-no-files-found: error
