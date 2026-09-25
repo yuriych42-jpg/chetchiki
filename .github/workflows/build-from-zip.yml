@@ -1,4 +1,3 @@
-```yaml
 name: Build APK from ZIP
 
 on:
@@ -21,54 +20,47 @@ jobs:
         run: |
           set -e
 
-          echo "=== SEARCH FOR ANDROID ZIP FILES ==="
-
           BEST_ZIP=""
           BEST_VERSION_CODE=-1
           BEST_VERSION_NAME=""
 
+          echo "=== SEARCHING ROOT ZIP FILES ==="
+
           while IFS= read -r -d '' ZIP_FILE; do
             echo ""
-            echo "----------------------------------------"
-            echo "Checking ZIP: $ZIP_FILE"
+            echo "Checking: $ZIP_FILE"
 
-            BUILD_FILE_IN_ZIP=$(unzip -Z1 "$ZIP_FILE" 2>/dev/null \
+            BUILD_FILE=$(unzip -Z1 "$ZIP_FILE" 2>/dev/null \
               | grep -E '(^|/)app/build\.gradle(\.kts)?$' \
               | head -1 || true)
 
-            if [ -z "$BUILD_FILE_IN_ZIP" ]; then
-              echo "SKIP: Android app build file not found"
+            if [ -z "$BUILD_FILE" ]; then
+              echo "SKIP: app/build.gradle(.kts) not found"
               continue
             fi
 
-            echo "Build file: $BUILD_FILE_IN_ZIP"
+            echo "Build file: $BUILD_FILE"
 
-            VERSION_CODE_LINE=$(unzip -p "$ZIP_FILE" "$BUILD_FILE_IN_ZIP" 2>/dev/null \
-              | grep -E '^[[:space:]]*versionCode[[:space:]]*=' \
+            BUILD_CONTENT=$(unzip -p "$ZIP_FILE" "$BUILD_FILE" 2>/dev/null || true)
+
+            VERSION_CODE=$(printf '%s\n' "$BUILD_CONTENT" \
+              | grep -E '^[[:space:]]*versionCode[[:space:]]+[0-9]+' \
+              | head -1 \
+              | grep -oE '[0-9]+' \
               | head -1 || true)
 
-            VERSION_NAME_LINE=$(unzip -p "$ZIP_FILE" "$BUILD_FILE_IN_ZIP" 2>/dev/null \
+            VERSION_NAME=$(printf '%s\n' "$BUILD_CONTENT" \
               | grep -E '^[[:space:]]*versionName[[:space:]]*=' \
-              | head -1 || true)
+              | head -1 \
+              | sed -E 's/.*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/' || true)
 
-            if [ -z "$VERSION_CODE_LINE" ]; then
+            if [ -z "$VERSION_CODE" ]; then
               echo "SKIP: versionCode not found"
               continue
             fi
 
-            VERSION_CODE=$(echo "$VERSION_CODE_LINE" \
-              | sed -E 's/[^0-9]*([0-9]+).*/\1/')
-
-            VERSION_NAME=$(echo "$VERSION_NAME_LINE" \
-              | sed -E 's/.*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/')
-
-            if ! [[ "$VERSION_CODE" =~ ^[0-9]+$ ]]; then
-              echo "SKIP: invalid versionCode"
-              continue
-            fi
-
-            echo "versionName: $VERSION_NAME"
             echo "versionCode: $VERSION_CODE"
+            echo "versionName: $VERSION_NAME"
 
             if [ "$VERSION_CODE" -gt "$BEST_VERSION_CODE" ]; then
               BEST_ZIP="$ZIP_FILE"
@@ -78,33 +70,27 @@ jobs:
 
           done < <(
             find . -maxdepth 1 -type f \
-              \( -name '*.zip' -o -name '*.ZIP' \) \
+              \( -iname '*.zip' \) \
               -print0
           )
 
           echo ""
           echo "========================================"
-          echo "SELECTED ZIP"
+          echo "SELECTED PROJECT"
+          echo "========================================"
+          echo "ZIP: $BEST_ZIP"
+          echo "versionName: $BEST_VERSION_NAME"
+          echo "versionCode: $BEST_VERSION_CODE"
           echo "========================================"
 
           if [ -z "$BEST_ZIP" ]; then
             echo "ERROR: No valid Android ZIP found."
-            echo ""
-            echo "ZIP files found:"
-            find . -maxdepth 1 -type f \
-              \( -name '*.zip' -o -name '*.ZIP' \) \
-              -print
             exit 1
           fi
 
-          echo "ZIP: $BEST_ZIP"
-          echo "versionName: $BEST_VERSION_NAME"
-          echo "versionCode: $BEST_VERSION_CODE"
-
           if [ "$BEST_VERSION_CODE" -lt 172 ]; then
-            echo ""
-            echo "ERROR: Selected project is older than version 1.72."
-            echo "Refusing to build old APK."
+            echo "ERROR: Selected ZIP is older than version 1.72."
+            echo "versionCode=$BEST_VERSION_CODE"
             exit 1
           fi
 
@@ -120,12 +106,11 @@ jobs:
 
           PROJECT_DIR=""
 
-          while IFS= read -r gradlew; do
-            DIR="$(dirname "$gradlew")"
+          while IFS= read -r GRADLEW; do
+            DIR="$(dirname "$GRADLEW")"
 
             if [ -f "$DIR/settings.gradle" ] || \
                [ -f "$DIR/settings.gradle.kts" ]; then
-
               if [ -d "$DIR/app" ]; then
                 PROJECT_DIR="$DIR"
                 break
@@ -135,17 +120,14 @@ jobs:
 
           if [ -z "$PROJECT_DIR" ]; then
             echo "ERROR: Android project root not found."
-
             echo ""
-            echo "settings.gradle files:"
+            echo "Found settings files:"
             find project \
               \( -name settings.gradle -o -name settings.gradle.kts \) \
               -print
-
             echo ""
-            echo "gradlew files:"
+            echo "Found gradlew files:"
             find project -type f -name gradlew -print
-
             exit 1
           fi
 
@@ -165,86 +147,42 @@ jobs:
           elif [ -f "$PROJECT_DIR/app/build.gradle" ]; then
             BUILD_FILE="$PROJECT_DIR/app/build.gradle"
           else
-            echo "ERROR: Android build file not found"
+            echo "ERROR: Build file not found."
             exit 1
           fi
 
           echo "=== BUILD FILE ==="
           cat "$BUILD_FILE"
 
-          VERSION_CODE_LINE=$(grep -E \
-            '^[[:space:]]*versionCode[[:space:]]*=' \
-            "$BUILD_FILE" \
+          VERSION_CODE=$(grep -E '^[[:space:]]*versionCode[[:space:]]+[0-9]+' "$BUILD_FILE" \
+            | head -1 \
+            | grep -oE '[0-9]+' \
             | head -1 || true)
 
-          VERSION_NAME_LINE=$(grep -E \
-            '^[[:space:]]*versionName[[:space:]]*=' \
-            "$BUILD_FILE" \
-            | head -1 || true)
-
-          VERSION_CODE=$(echo "$VERSION_CODE_LINE" \
-            | sed -E 's/[^0-9]*([0-9]+).*/\1/')
-
-          VERSION_NAME=$(echo "$VERSION_NAME_LINE" \
-            | sed -E 's/.*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/')
+          VERSION_NAME=$(grep -E '^[[:space:]]*versionName[[:space:]]*=' "$BUILD_FILE" \
+            | head -1 \
+            | sed -E 's/.*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/' || true)
 
           echo ""
           echo "SOURCE versionName: $VERSION_NAME"
           echo "SOURCE versionCode: $VERSION_CODE"
 
-          if [ -z "$VERSION_CODE" ] || ! [[ "$VERSION_CODE" =~ ^[0-9]+$ ]]; then
-            echo "ERROR: Could not read versionCode"
+          if [ -z "$VERSION_CODE" ]; then
+            echo "ERROR: Could not read versionCode."
             exit 1
           fi
 
           if [ "$VERSION_CODE" -lt 172 ]; then
-            echo ""
-            echo "ERROR: This is still an old project."
-            echo "Expected versionCode >= 172."
+            echo "ERROR: Source project is older than 1.72."
             exit 1
           fi
 
-      - name: Set up JDK
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
           cache: gradle
-
-      - name: Install Android SDK packages
-        shell: bash
-        run: |
-          set -e
-
-          if [ -n "${ANDROID_SDK_ROOT:-}" ]; then
-            SDK_ROOT="$ANDROID_SDK_ROOT"
-          elif [ -n "${ANDROID_HOME:-}" ]; then
-            SDK_ROOT="$ANDROID_HOME"
-          else
-            SDK_ROOT="/usr/local/lib/android/sdk"
-          fi
-
-          echo "Android SDK: $SDK_ROOT"
-
-          if [ -x "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
-            SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-          elif [ -x "$SDK_ROOT/cmdline-tools/16.0/bin/sdkmanager" ]; then
-            SDKMANAGER="$SDK_ROOT/cmdline-tools/16.0/bin/sdkmanager"
-          elif command -v sdkmanager >/dev/null 2>&1; then
-            SDKMANAGER="$(command -v sdkmanager)"
-          else
-            echo "sdkmanager not found"
-            exit 1
-          fi
-
-          echo "sdkmanager: $SDKMANAGER"
-
-          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
-
-          "$SDKMANAGER" --install \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
 
       - name: Prepare Gradle
         shell: bash
@@ -254,15 +192,11 @@ jobs:
 
           chmod +x gradlew
 
-          echo "=== GRADLE WRAPPER ==="
-          cat gradle/wrapper/gradle-wrapper.properties
-
-          sed -i -E \
-            's#^distributionUrl=.*#distributionUrl=https://services.gradle.org/distributions/gradle-8.9-all.zip#' \
-            gradle/wrapper/gradle-wrapper.properties
-
-          echo "=== UPDATED GRADLE WRAPPER ==="
-          cat gradle/wrapper/gradle-wrapper.properties
+          if [ -f gradle/wrapper/gradle-wrapper.properties ]; then
+            sed -i \
+              's#^distributionUrl=.*#distributionUrl=https\://services.gradle.org/distributions/gradle-8.9-all.zip#' \
+              gradle/wrapper/gradle-wrapper.properties
+          fi
 
           mkdir -p "$HOME/.gradle"
 
@@ -271,6 +205,9 @@ jobs:
           android.enableJetifier=true
           org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
           EOF
+
+          echo "=== GRADLE WRAPPER ==="
+          cat gradle/wrapper/gradle-wrapper.properties
 
       - name: Build APK
         shell: bash
@@ -282,33 +219,33 @@ jobs:
 
           ./gradlew clean assembleDebug --stacktrace
 
-      - name: Verify APK version
+      - name: Verify APK
         shell: bash
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
           set -e
 
           echo "=== APK FILES ==="
+          find . -type f -name '*.apk' -print
 
-          find . -type f -name "*.apk" -print
-
-          APK=$(find . -type f -name "*.apk" | head -1)
+          APK=$(find . -type f -name '*.apk' | head -1)
 
           if [ -z "$APK" ]; then
-            echo "ERROR: APK not found"
+            echo "ERROR: APK not found."
             exit 1
           fi
 
           echo ""
           echo "APK: $APK"
 
-          if command -v aapt >/dev/null 2>&1; then
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+
+          AAPT="$SDK_ROOT/build-tools/35.0.0/aapt"
+
+          if [ -x "$AAPT" ]; then
             echo ""
             echo "=== APK VERSION ==="
-
-            aapt dump badging "$APK" \
-              | grep -E 'package:|versionCode|versionName' \
-              | head -5
+            "$AAPT" dump badging "$APK" | grep -E '^package:'
           fi
 
           echo "APK=$APK" >> "$GITHUB_ENV"
@@ -319,4 +256,3 @@ jobs:
           name: chetchiki-apk-1.72
           path: ${{ env.PROJECT_DIR }}/${{ env.APK }}
           if-no-files-found: error
-```
